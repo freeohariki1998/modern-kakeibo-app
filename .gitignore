@@ -28,3 +28,24 @@ target/
 node_modules/
 dist/
 *.class
+
+### Gradle (特に重要) ###
+backend/.gradle/
+backend/build/
+backend/bin/
+
+### IDE / エディタ設定 (複数人開発・環境移行で重要) ###
+.idea/
+*.iws
+*.iml
+*.ipr
+backend/out/
+.vscode/
+.settings/
+.classpath
+.project
+.factorypath
+
+### その他 (DB関連など) ###
+postgres_data/
+.env
