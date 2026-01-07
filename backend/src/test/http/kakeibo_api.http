@@ -1,0 +1,12 @@
+### データの保存テスト
+POST http://localhost:8080/api/kakeibo
+Content-Type: application/json
+
+{
+  "transactionDate": "2025-01-01",
+  "title": "REST Clientからのテスト",
+  "amount": -500
+}
+
+### データの全件取得テスト
+GET http://localhost:8080/api/kakeibo
