@@ -19,11 +19,17 @@ public class KakeiboController {
 
     @GetMapping
     public List<Kakeibo> getAllKakeibo(){
-        return repository.findAll();
+//        return repository.findAll();
+        return repository.findAllByOrderByTransactionDateDesc();
     }
 
     @PostMapping
     public Kakeibo create(@RequestBody Kakeibo kakeibo) {
         return repository.save(kakeibo);
+    }
+
+    @DeleteMapping("/{id}")
+    public void delete(@PathVariable Long id) {
+        repository.deleteById(id);
     }
 }
