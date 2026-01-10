@@ -22,4 +22,6 @@ public class Kakeibo {
     private Timestamp createAt;
     @Column(name = "updated_at")
     private Timestamp updateAt;
+    // カテゴリー
+    private String category;
 }
