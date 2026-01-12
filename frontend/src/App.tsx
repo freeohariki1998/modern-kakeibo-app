@@ -2,19 +2,12 @@ import { useEffect, useState } from "react";
 import './App.css';
 import CategoryPieChart from "./components/CategoryPieChart";
 import TransactionList from './components/TransactionList';
-// まとめてインポートできます
+import type { Kakeibo, CategoryMaster, CategoryTotals, CategorySummary } from "./types";
 import { BsChevronLeft, BsChevronRight } from "react-icons/bs";
-// データの型を定義
-interface Kakeibo {
-    id?: number;
-    transactionDate: string;
-    category: string;
-    categoryId: number;
-    title: string;
-    amount: number;
-}
 
 function App() {
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
     // 状態管理 (DBから受け取ったデータを保存)
     const [data, setData] = useState<Kakeibo[]>([]);
 
@@ -25,11 +18,14 @@ function App() {
     const [message, setMessage] = useState("");
 
     // カテゴリを取得
-    const [masterCategoryes, setMasterCategoryes] = useState<{id: number, name:string, colorClass:string}[]>([]);
+    const [masterCategoryes, setMasterCategoryes] = useState<CategoryMaster[]>([]);
     const [selectedCateegory, setSelectedCateegory] = useState("")
 
     // 月の管理
     const [currentDate, setCurrentDate] = useState(new Date())
+
+    // APIから取得した集計データを保存する
+    const [categoryTotals, setCategoryTotals] = useState<CategoryTotals>({});
 
     /* ----------------
         画面開いたときのAPIの処理
@@ -62,10 +58,36 @@ function App() {
         .catch(err => console.error("マスターエラー：",err.message));
     }
 
+    const fetchSummary = async (monthStr: string) => {
+        setIsLoading(true);
+        setError(null);
+        try{
+            const res  = await fetch(`/api/kakeibo/summary?month=${monthStr}`);
+            if(!res.ok){
+                throw new Error("サーバーとの通信に失敗しました。時間をおいて再度お試しください。")
+            }
+            const json: CategorySummary[] = await res.json();
+            const formattted = json.reduce((acc, cur) => {
+                    acc[cur.category] = cur.amount;
+                    return acc;
+                },{} as Record<string, number>); 
+            setCategoryTotals(formattted);
+        } catch (err: unknown) {
+            if(err instanceof Error){
+                setError(err.message);
+            }else{
+                setError("予期せぬエラーが発生しました。");
+            }
+            console.error("集計取得エラー:", err)
+        }finally{
+            setIsLoading(false);
+        }
+    };
+
     // 画面開いたときに実行
     useEffect(() => {
-    fetchData();
-    fetchMaster();
+        fetchData();
+        fetchMaster();
     },[]);
 
     /* ----------------
@@ -91,6 +113,7 @@ function App() {
         fetchData(); // 送信成功後、リストを再読み込み
         setTitle(""); // 入力欄を空にする
         setAmount("");
+        fetchSummary(currentYearMonth);
         setMessage("保存しました！"); // メッセージをセット
 
         // 一旦３秒後にメッセージを返す
@@ -109,6 +132,7 @@ function App() {
         .then(() => {
         fetchData(); // 削除成功後、リストを再読み込み
         setMessage("削除しました！"); // メッセージをセット
+        fetchSummary(currentYearMonth);
         setTimeout(() => setMessage(""), 3000);
         })
         .catch(err => console.error("削除失敗:", err));
@@ -124,13 +148,13 @@ function App() {
     // dataの中から現在の年月に一致するものだけを抽出
     const filteredData = data.filter(item => item.transactionDate.startsWith(currentYearMonth));
     // 抽出したデータを使って合計やグラフ用データを計算
-    const totalAmount = filteredData.reduce((sum, item) => sum + item.amount, 0);
+    const totalAmount = (Object.values(categoryTotals) as number[]).reduce((sum, val) => sum + val, 0);
     // カテゴリ別の合計を計算
-    const categoryTotals = filteredData.reduce((acc, item) => {
-        const cat = item.category || "未分類";
-        acc[cat] = (acc[cat] || 0) + item.amount;
-        return acc;
-    }, {} as Record<string, number>);
+    // const categoryTotals = filteredData.reduce((acc, item) => {
+    //     const cat = item.category || "未分類";
+    //     acc[cat] = (acc[cat] || 0) + item.amount;
+    //     return acc;
+    // }, {} as Record<string, number>);
 
     /* ----------------
         カレンダー・表示制御
@@ -141,6 +165,11 @@ function App() {
         const nextMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + offset, 1)
         setCurrentDate(nextMonth)
     }
+    // 月が変わるたびに実行されるように監視
+    useEffect(() => {
+        const yearMonth = `${currentDate.getFullYear()}-${(currentDate.getMonth() + 1).toString().padStart(2, '0')}`;
+        fetchSummary(yearMonth);
+    }, [currentDate]); // currentDateが変わるたびに再実行
 
     return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-8">
@@ -175,20 +204,34 @@ function App() {
                     {message}
                 </div>
                 )}
-                { /* 合計表示エリア */}
+                { /* 合計表示 */}
                 <div className="bg-white p-4 rounded-xl shadow-sm md-6 flex justify-between items-center border-t-4 border-indigo-500">
                     <span className="text-gray-600 font-bold">今月の合計支出</span>
                     <span className="text-2xl font-black text-indigo-700">
                         ¥{totalAmount.toLocaleString()}
                     </span>
                 </div>
-                { /* グラフの表示 */}
-                <CategoryPieChart categoryTotals={categoryTotals} />
+                { /* エラー表示 */}
+                {error && (
+                    <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+                        <p className="font-bold">エラーが発生しました</p>
+                        <p>{error}</p>
+                    </div>
+                )}
+                {/* ローディング表示 */}
+                {isLoading ? (
+                    <div className="flex justify-center items-center p-10">
+                        <div className="animate-spin h-10 w-10 border-4 border-indigo-500 rounded-full border-t-transparent"></div>
+                        <p className="ml-3 text-indigo-600 font-bold">データを読み込み中...</p>
+                    </div>
+                ) : (
+                    <CategoryPieChart categoryTotals={categoryTotals} />
+                )}
                 { /* カテゴリ別合計表示エリア */}
                 <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
                     <h3 className="text-sm font-bold text-gray-500 mb-3">カテゴリ別内訳</h3>
                     <div className="space-y-2">
-                        {Object.entries(categoryTotals).map(([categoryName, total]) => (
+                        {(Object.entries(categoryTotals) as [string, number][]).map(([categoryName, total]) => (
                         <div key={categoryName} className="flex justify-between items-center text-sm">
                             <span className="text-gray-600">{categoryName}</span>
                             <span className="font-bold text-gray-800">¥{total.toLocaleString()}</span>
