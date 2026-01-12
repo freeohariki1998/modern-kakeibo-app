@@ -7,6 +7,7 @@ interface KakeiboItem {
     title: string;
     amount: number;
     category: string;
+    categoryId: number;
     transactionDate: string;
 }
 
@@ -33,7 +34,7 @@ const TransactionList: React.FC<TransactionListProps> = ({ data, handleDelete, m
                 {/* データをリスト表示する */}
                 <div className="list mt-8 space-y-4">
                 {data.map((item) => {
-                    const categoryMaster = masterCategories.find(cat => cat.name === item.category);
+                    const categoryMaster = masterCategories.find(cat => cat.id === item.categoryId);
                     const badgeColor = categoryMaster?.colorClass || "bg-gray-100 text-gray-600";
                     return (
                     <div key={item.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-white hover:shadow-md transition-all border border-transparent hover:border-gray-200">

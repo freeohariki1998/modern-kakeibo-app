@@ -9,6 +9,7 @@ interface Kakeibo {
     id?: number;
     transactionDate: string;
     category: string;
+    categoryId: number;
     title: string;
     amount: number;
 }
@@ -72,12 +73,13 @@ function App() {
     ----------------*/
     // 送信
     const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault(); // 画面リロードを防ぐ
-
-    const newItem = { 
-        transactionDate: date, 
-        title, amount,
-        category:selectedCateegory
+        e.preventDefault(); // 画面リロードを防ぐ
+        const selectedMaster = masterCategoryes.find(cat => cat.name === selectedCateegory)
+        const newItem = { 
+            transactionDate: date, 
+            title, amount,
+            category:selectedCateegory,
+            categoryId:selectedMaster?.id
     };
 
     fetch("/api/kakeibo",{

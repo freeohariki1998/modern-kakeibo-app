@@ -24,4 +24,6 @@ public class Kakeibo {
     private Timestamp updateAt;
     // カテゴリー
     private String category;
+    @Column(name = "category_id")
+    private  Integer categoryId;
 }
