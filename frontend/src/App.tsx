@@ -160,20 +160,23 @@ function App() {
     }
 
     // 削除
-    const handleDelete = (id?: number) => {
-    if(!window.confirm("本当に削除しますか？")) return; // 確認ダイアログ
+    const handleDelete = async(id?: number) => {
+        if(!window.confirm("本当に削除しますか？")) return; // 確認ダイアログ
+        setIsLoading(true)
+        try{
+            const res = await fetch(`/api/kakeibo/${id}`, {method: "DELETE" });
+            if(res.ok){
+                await fetchData(); // 削除成功後、リストを再読み込み
+                await fetchSummary(currentYearMonth);
+                setMessage("削除しました！"); // メッセージをセット
+            }
+        }catch(err){
+            console.error("削除失敗:", err)
+        }finally{
+            setIsLoading(false)
+        }
+    };
 
-    fetch(`/api/kakeibo/${id}`, {
-        method: "DELETE",
-    })
-        .then(() => {
-        fetchData(); // 削除成功後、リストを再読み込み
-        setMessage("削除しました！"); // メッセージをセット
-        fetchSummary(currentYearMonth);
-        setTimeout(() => setMessage(""), 3000);
-        })
-        .catch(err => console.error("削除失敗:", err));
-    }
 
     // 予算を保存
     const handleSaveBudget = async () => {
@@ -269,9 +272,10 @@ function App() {
                     />
                     <button
                         onClick={() => handleSaveBudget()}
+                        disabled={isLoading}
                         className="bg-indigo-600 text-white px-4 py-1 rounded text-sm hover:bg-indigo-700 transition-colors"
                     >
-                        予算を保存
+                        {isLoading ? "保存中..." : "予算を保存"}
                     </button>
                 </div>
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
