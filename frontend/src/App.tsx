@@ -27,6 +27,9 @@ function App() {
     // APIから取得した集計データを保存する
     const [categoryTotals, setCategoryTotals] = useState<CategoryTotals>({});
 
+    // 予算
+    const [budget, setBudget] = useState<number>(0);
+
     /* ----------------
         画面開いたときのAPIの処理
     ----------------*/
@@ -58,6 +61,7 @@ function App() {
         .catch(err => console.error("マスターエラー：",err.message));
     }
 
+    // 現在の日付を取得する
     const fetchSummary = async (monthStr: string) => {
         setIsLoading(true);
         setError(null);
@@ -84,6 +88,17 @@ function App() {
         }
     };
 
+    // 予算取得
+    const fetchBudget = async(monthStr: string) => {
+        try{
+            const res = await fetch(`/api/budget/${monthStr}`);
+            const amount = await res.json();
+            setBudget(amount);
+        }catch(err){
+            console.error("予算取得エラー:",err)
+        }
+    }
+
     // 画面開いたときに実行
     useEffect(() => {
         fetchData();
@@ -91,35 +106,57 @@ function App() {
     },[]);
 
     /* ----------------
+        集計・計算ロジック
+    ----------------*/    
+    // 表示対象月を作る(yyyy-MM)
+    const year = currentDate.getFullYear();
+    const month = (currentDate.getMonth() + 1).toString().padStart(2, '0');
+    const currentYearMonth = `${year}-${month}`;
+    // dataの中から現在の年月に一致するものだけを抽出
+    const filteredData = data.filter(item => item.transactionDate.startsWith(currentYearMonth));
+    // 抽出したデータを使って合計やグラフ用データを計算
+    const totalAmount = (Object.values(categoryTotals) as number[]).reduce((sum, val) => sum + val, 0);
+    // 予算
+    const usageRate = budget > 0 ? (totalAmount / budget) * 100 : 0;
+    const isOverBudget = totalAmount > budget;
+
+    /* ----------------
         画面内APIの処理
     ----------------*/
     // 送信
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async(e: React.FormEvent) => {
         e.preventDefault(); // 画面リロードを防ぐ
-        const selectedMaster = masterCategoryes.find(cat => cat.name === selectedCateegory)
-        const newItem = { 
-            transactionDate: date, 
-            title, amount,
-            category:selectedCateegory,
-            categoryId:selectedMaster?.id
-    };
+        setError(null);
+        try {
+            const selectedMaster = masterCategoryes.find(cat => cat.name === selectedCateegory)
+            const newItem = { 
+                transactionDate: date, 
+                title, amount,
+                category:selectedCateegory,
+                categoryId:selectedMaster?.id
+            };
+            const res = await fetch("/api/kakeibo",{
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(newItem),
+            })
+            if (!res.ok) {
+                const errorData = await res.json();
+                throw new Error(errorData.message || "入力内容に不備があります")
+            }
+            fetchData(); // 送信成功後、リストを再読み込み
+            setTitle(""); // 入力欄を空にする
+            setAmount("");
+            fetchSummary(currentYearMonth);
+            setMessage("保存しました！"); // メッセージをセット
 
-    fetch("/api/kakeibo",{
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newItem),
-    })
-    .then(() => {
-        fetchData(); // 送信成功後、リストを再読み込み
-        setTitle(""); // 入力欄を空にする
-        setAmount("");
-        fetchSummary(currentYearMonth);
-        setMessage("保存しました！"); // メッセージをセット
-
-        // 一旦３秒後にメッセージを返す
-        setTimeout(() => setMessage(""), 3000);
-    })
-    .catch(err => console.error("保存失敗:", err))
+            // 一旦３秒後にメッセージを返す
+            setTimeout(() => setMessage(""), 3000);
+        }catch(err: unknown){
+            if (err instanceof Error) {
+                setError(err.message); // 画面上の赤いエラー枠に表示される
+            }
+        }
     }
 
     // 削除
@@ -138,23 +175,31 @@ function App() {
         .catch(err => console.error("削除失敗:", err));
     }
 
-    /* ----------------
-        集計・計算ロジック
-    ----------------*/    
-    // 表示対象月を作る(yyyy-MM)
-    const year = currentDate.getFullYear();
-    const month = (currentDate.getMonth() + 1).toString().padStart(2, '0');
-    const currentYearMonth = `${year}-${month}`;
-    // dataの中から現在の年月に一致するものだけを抽出
-    const filteredData = data.filter(item => item.transactionDate.startsWith(currentYearMonth));
-    // 抽出したデータを使って合計やグラフ用データを計算
-    const totalAmount = (Object.values(categoryTotals) as number[]).reduce((sum, val) => sum + val, 0);
-    // カテゴリ別の合計を計算
-    // const categoryTotals = filteredData.reduce((acc, item) => {
-    //     const cat = item.category || "未分類";
-    //     acc[cat] = (acc[cat] || 0) + item.amount;
-    //     return acc;
-    // }, {} as Record<string, number>);
+    // 予算を保存
+    const handleSaveBudget = async () => {
+        // 現在表示している年月を取得
+        const yearMonth = `${currentDate.getFullYear()}-${(currentDate.getMonth() + 1).toLocaleString().padStart(2,'0')}`;
+        try{
+            const res = await fetch(`api/budget/${yearMonth}` , {
+                method: "POST",
+                headers: { "Content-type" : "application/json"},
+                body: JSON.stringify({ amount:budget}),
+            });
+            
+            if(res.ok){
+                setMessage("予算を更新しました！");
+                setTimeout(() => setMessage(""), 3000);
+                fetchBudget(yearMonth)
+            }else{
+                throw new Error("保存に失敗しました");
+            }
+        }catch(err){
+            console.error(err);
+            setError("予算の保存中にエラーが発生しました")
+        }
+    }
+
+    
 
     /* ----------------
         カレンダー・表示制御
@@ -169,6 +214,7 @@ function App() {
     useEffect(() => {
         const yearMonth = `${currentDate.getFullYear()}-${(currentDate.getMonth() + 1).toString().padStart(2, '0')}`;
         fetchSummary(yearMonth);
+        fetchBudget(yearMonth);
     }, [currentDate]); // currentDateが変わるたびに再実行
 
     return (
@@ -210,6 +256,49 @@ function App() {
                     <span className="text-2xl font-black text-indigo-700">
                         ¥{totalAmount.toLocaleString()}
                     </span>
+                </div>
+                {/* 予算表示 */}
+                <div className="flex items-center gap-2 mb-4 bg-gray-50 p-3 rouded-lg">
+                    <label className="text-sm font-bold text-gray-600"> 今月の予算:</label>
+                    <input
+                        type="number"
+                        value={budget === 0 ? "" : budget}
+                        onChange={(e) => setBudget(Number(e.target.value))}
+                        className="w-32 px-2 py-1 border rouded text-right font-mono"
+                        placeholder="予算を入力"
+                    />
+                    <button
+                        onClick={() => handleSaveBudget()}
+                        className="bg-indigo-600 text-white px-4 py-1 rounded text-sm hover:bg-indigo-700 transition-colors"
+                    >
+                        予算を保存
+                    </button>
+                </div>
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                    <div className="flex justify-between items-end mb-2">
+                        <div>
+                            <span className="text-sm text-gray-500 font-bold">予算進捗</span>
+                            <div className="flex items-baseline gap-2">
+                                <span className="text-2xl font-black text-gray-800">
+                                    {Math.round(usageRate)}%
+                                </span>
+                                <span className="text-sm text-gray-500">
+                                    (¥{totalAmount.toLocaleString()} / ¥{budget.toLocaleString()})
+                                </span>
+                            </div>
+                        </div>
+                        <span className={`text-sm font-bold ${isOverBudget ? 'text-red-500' : 'text-green-500'}`}>
+                            {isOverBudget ? `¥${(totalAmount - budget).toLocaleString()} オーバー` : `残り ¥${(budget - totalAmount).toLocaleString()}`}
+                        </span>
+                    </div>
+                    {/* 進捗バー */}
+                    <div className="w-full bg-gray-100 rounded-full h-4 overflow-hidden">
+                        { /* 動くバー */}
+                        <div className={`h-full transition-all duration-500 ${isOverBudget ? 'bg-red-500' : 'bg-indigo-500'}`}
+                            style={{ width: `${Math.min(usageRate, 100)}%`}}>
+
+                        </div>
+                    </div>
                 </div>
                 { /* エラー表示 */}
                 {error && (
