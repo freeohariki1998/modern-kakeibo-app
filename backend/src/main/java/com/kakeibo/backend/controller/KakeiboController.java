@@ -47,6 +47,22 @@ public class KakeiboController {
         return ResponseEntity.ok(repository.save(kakeibo));
     }
 
+    @PutMapping("/{id}")
+    public  ResponseEntity<Kakeibo> updateKakeibo(@PathVariable Long id, @RequestBody Kakeibo updateItem){
+        return repository.findById(id)
+                .map(item -> {
+                    item.setTitle(updateItem.getTitle());
+                    item.setAmount(updateItem.getAmount());
+                    item.setCategory(updateItem.getCategory());
+                    item.setCategoryId(updateItem.getCategoryId());
+                    item.setTransactionDate(updateItem.getTransactionDate());
+                    Kakeibo saveItem = repository.save(item);
+                    return ResponseEntity.ok(saveItem);
+                })
+                .orElse(ResponseEntity.notFound().build());
+
+    }
+
     @DeleteMapping("/{id}")
     public void delete(@PathVariable Long id) {
         repository.deleteById(id);

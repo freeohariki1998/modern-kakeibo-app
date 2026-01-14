@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import './App.css';
 import CategoryPieChart from "./components/CategoryPieChart";
 import TransactionList from './components/TransactionList';
-import type { Kakeibo, CategoryMaster, CategoryTotals, CategorySummary } from "./types";
+import type { Kakeibo, CategoryMaster, CategoryTotals, CategorySummary, KakeiboItem } from "./types";
 import { BsChevronLeft, BsChevronRight } from "react-icons/bs";
+import EditModal from "./components/EditModal";
 
 function App() {
     const [isLoading, setIsLoading] = useState(false);
@@ -30,6 +31,8 @@ function App() {
     // 予算
     const [budget, setBudget] = useState<number>(0);
 
+    // 編集中のアイテムを保持
+    const [editingItem, setEditingItem] = useState<KakeiboItem | null>(null);
     /* ----------------
         画面開いたときのAPIの処理
     ----------------*/
@@ -130,11 +133,12 @@ function App() {
         try {
             const selectedMaster = masterCategoryes.find(cat => cat.name === selectedCateegory)
             const newItem = { 
-                transactionDate: date, 
-                title, amount,
-                category:selectedCateegory,
-                categoryId:selectedMaster?.id
-            };
+            transactionDate: date, 
+            title, 
+            amount,
+            category: selectedCateegory,
+            categoryId: selectedMaster?.id || 0
+        };
             const res = await fetch("/api/kakeibo",{
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -156,6 +160,34 @@ function App() {
             if (err instanceof Error) {
                 setError(err.message); // 画面上の赤いエラー枠に表示される
             }
+        }
+    }
+
+    // 編集
+    const handleEdit = (item: KakeiboItem) => {
+        setEditingItem(item) // 編集したいデータをセットする
+    }
+    const handleUpdate = async(updatedItem: KakeiboItem) => {
+        try{
+            // idがないと処理終了
+            if(!updatedItem.id) return;
+            const res = await fetch(`/api/kakeibo/${updatedItem.id}`, {
+                method:'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(updatedItem)
+            });
+            if (!res.ok) {
+                throw new Error("サーバー側の更新に失敗しました");
+            }
+            await fetchData(); // 送信成功後、リストを再読み込み
+            setEditingItem(null);
+            await fetchSummary(currentYearMonth);
+            alert("更新が完了しました！");
+        }catch (err){
+            console.error("編集処理が失敗しました",err);
+            alert("更新に失敗しました。");
         }
     }
 
@@ -391,9 +423,18 @@ function App() {
             <div className="lg:col-span-8">
                 <TransactionList 
                     data={filteredData} 
-                    handleDelete={handleDelete} 
+                    handleDelete={handleDelete}
+                    handleEdit={handleEdit}
                     masterCategories={masterCategoryes}
                 />
+                {editingItem && (
+                    <EditModal
+                        item={editingItem}
+                        masterCategories={masterCategoryes}
+                        onClose={() => setEditingItem(null)}
+                        onSave={handleUpdate}
+                    />
+                )}
             </div>
         </div>
         </div>
