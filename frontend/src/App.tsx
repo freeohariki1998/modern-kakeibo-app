@@ -40,28 +40,34 @@ function App() {
     const fetchData = () => {
     fetch("/api/kakeibo")
         .then(res => {
-        if(!res.ok) throw new Error("家計簿データの取得に失敗しました");
-        return res.json();
+            if(!res.ok) throw new Error("家計簿データの取得に失敗しました");
+            return res.json();
         }) // 届いたデータをJOSONとして解析
         .then(json => setData(json)) // 取得したデータを「data」に保存
-        .catch(err => console.error("家計簿エラー：",err.message));
+        .catch((err) => {
+            setMessage("");
+            console.error("家計簿エラー：",err.message);
+        });
     }
 
     // マスタデータを取得
     const fetchMaster = () => {
-    fetch("/api/master/CATEGORY")
-        .then(res => {
-        if (!res.ok) throw new Error("マスタデータの取得に失敗しました");
-        return res.json();
-        })
-        .then((data) => {
-        setMasterCategoryes(data);
-        // 最初の項目をデフォルトにセット
-        if(data.length > 0) {
-            setSelectedCateegory(data[0].name);
-        }
-        })
-        .catch(err => console.error("マスターエラー：",err.message));
+        fetch("/api/master/CATEGORY")
+            .then(res => {
+                if (!res.ok) throw new Error("マスタデータの取得に失敗しました");
+                return res.json();
+            })
+            .then((data) => {
+                setMasterCategoryes(data);
+                // 最初の項目をデフォルトにセット
+                if(data.length > 0) {
+                    setSelectedCateegory(data[0].name);
+                }
+            })
+        .catch((err) => {
+            setMessage("");
+            console.error("マスターエラー：", err.message);
+        });
     }
 
     // 現在の日付を取得する
@@ -80,6 +86,7 @@ function App() {
                 },{} as Record<string, number>); 
             setCategoryTotals(formattted);
         } catch (err: unknown) {
+            setMessage("");
             if(err instanceof Error){
                 setError(err.message);
             }else{
@@ -98,6 +105,7 @@ function App() {
             const amount = await res.json();
             setBudget(amount);
         }catch(err){
+            setMessage("");
             console.error("予算取得エラー:",err)
         }
     }
@@ -157,6 +165,7 @@ function App() {
             // 一旦３秒後にメッセージを返す
             setTimeout(() => setMessage(""), 3000);
         }catch(err: unknown){
+            setMessage("");
             if (err instanceof Error) {
                 setError(err.message); // 画面上の赤いエラー枠に表示される
             }
@@ -185,7 +194,8 @@ function App() {
             setEditingItem(null);
             await fetchSummary(currentYearMonth);
             alert("更新が完了しました！");
-        }catch (err){
+        }catch(err){
+            setMessage("");
             console.error("編集処理が失敗しました",err);
             alert("更新に失敗しました。");
         }
@@ -203,6 +213,7 @@ function App() {
                 setMessage("削除しました！"); // メッセージをセット
             }
         }catch(err){
+            setMessage("");
             console.error("削除失敗:", err)
         }finally{
             setIsLoading(false)
@@ -229,6 +240,7 @@ function App() {
                 throw new Error("保存に失敗しました");
             }
         }catch(err){
+            setMessage("");
             console.error(err);
             setError("予算の保存中にエラーが発生しました")
         }
